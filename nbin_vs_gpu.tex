@@ -1,0 +1,184 @@
+% This file was created by tikzplotlib v0.9.5.
+\begin{tikzpicture}
+
+\definecolor{color0}{rgb}{0.12156862745098,0.466666666666667,0.705882352941177}
+\definecolor{color1}{rgb}{1,0.498039215686275,0.0549019607843137}
+\definecolor{color2}{rgb}{0.172549019607843,0.627450980392157,0.172549019607843}
+\definecolor{color3}{rgb}{0.83921568627451,0.152941176470588,0.156862745098039}
+\definecolor{color4}{rgb}{0.580392156862745,0.403921568627451,0.741176470588235}
+\definecolor{color5}{rgb}{0.549019607843137,0.337254901960784,0.294117647058824}
+\definecolor{color6}{rgb}{0.890196078431372,0.466666666666667,0.76078431372549}
+
+\begin{axis}[
+trim axis left,
+scaled y ticks=base 10:-3,
+legend cell align={left},
+legend style={fill opacity=0.8, draw opacity=1, text opacity=1, at={(0.03,0.97)}, anchor=north west, draw=white!80!black},
+tick align=outside,
+tick pos=left,
+x grid style={white!69.0196078431373!black},
+xlabel={n bins},
+xmajorgrids,
+xmin=0.75, xmax=50.25,
+xtick style={color=black},
+y grid style={white!69.0196078431373!black},
+ylabel={ms},
+ymajorgrids,
+ymin=428.139485, ymax=3964.206415,
+ytick style={color=black}
+]
+\addplot [semithick, color0, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+3 943.1057
+4 944.2749
+5 969.4675
+6 975.6814
+7 979.4899
+8 986.3104
+9 1006.668
+10 1013.8694
+11 1030.6982
+12 1044.5912
+13 1057.3647
+14 1082.8962
+15 1099.4697
+16 1208.7463
+17 1170.0627
+18 1211.2579
+19 1235.6406
+20 1313.8279
+21 1294.2299
+22 1335.4098
+23 1377.6837
+24 1418.8246
+25 1461.5667
+26 1515.6802
+27 1557.0087
+28 1617.1188
+29 1670.9391
+30 1742.2667
+31 1814.029
+32 1889.0478
+33 2042.9148
+34 2108.0246
+35 2196.0516
+36 2292.3042
+37 2392.8607
+38 2490.7206
+39 2583.812
+40 2757.2727
+41 2815.3309
+42 2943.05
+43 3081.5659
+44 3211.5698
+45 3344.5435
+46 3484.7445
+47 3646.4407
+48 3803.4761
+};
+\addlegendentry{1 gpu(s)}
+\addplot [semithick, color1, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+4 nan
+6 1133.3784
+8 1168.6091
+10 1160.0485
+12 1165.4643
+14 1158.6086
+16 1181.3189
+18 1209.5144
+20 1217.6913
+22 1242.9218
+24 1356.0882
+26 1290.7618
+28 1316.9159
+30 1347.8116
+32 1370.2442
+34 1439.474
+36 1484.3031
+38 1524.6067
+40 1577.9177
+42 1636.6331
+44 1706.7708
+46 1765.2845
+48 1836.6969
+};
+\addlegendentry{2 gpu(s)}
+\addplot [semithick, color2, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+6 nan
+9 588.8698
+12 612.4981
+15 1154.4634
+18 1174.6005
+21 1280.8339
+24 1189.7038
+27 1198.5734
+30 1205.4692
+33 1342.6771
+36 1275.028
+39 1288.1195
+42 1318.6105
+45 1358.3228
+48 1403.9581
+};
+\addlegendentry{3 gpu(s)}
+\addplot [semithick, color3, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+8 nan
+12 652.4368
+16 646.5691
+20 679.9541
+24 675.4452
+28 675.3063
+32 680.715
+36 716.322
+40 687.7385
+44 708.2684
+48 711.2287
+};
+\addlegendentry{4 gpu(s)}
+\addplot [semithick, color4, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+10 nan
+15 672.9508
+20 684.3733
+25 703.9098
+30 722.9178
+35 726.3665
+40 756.6843
+45 748.635
+};
+\addlegendentry{5 gpu(s)}
+\addplot [semithick, color5, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+12 nan
+18 725.5027
+24 725.6919
+30 777.0953
+36 774.0679
+42 779.6713
+48 771.0958
+};
+\addlegendentry{6 gpu(s)}
+\addplot [semithick, color6, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+14 nan
+21 836.6572
+28 805.9088
+35 809.569
+42 794.854
+};
+\addlegendentry{7 gpu(s)}
+\addplot [semithick, white!49.8039215686275!black, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+table {%
+16 nan
+24 898.5525
+32 826.4023
+40 872.405
+48 892.5282
+};
+\addlegendentry{8 gpu(s)}
+\end{axis}
+
+\end{tikzpicture}
