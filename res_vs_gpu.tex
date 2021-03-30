@@ -10,105 +10,102 @@
 \definecolor{color6}{rgb}{0.890196078431372,0.466666666666667,0.76078431372549}
 
 \begin{axis}[
-% scaled x ticks=true,
-trim axis left,
-scaled y ticks=base 10:-3,
 legend cell align={left},
 legend style={fill opacity=0.8, draw opacity=1, text opacity=1, at={(0.03,0.97)}, anchor=north west, draw=white!80!black},
 tick align=outside,
 tick pos=left,
-xlabel={resolution},
-xmin=200, xmax=9588.8,
-xtick style={color=black},
 x grid style={white!69.0196078431373!black},
-y grid style={white!69.0196078431373!black},
+xlabel={resolution},
 xmajorgrids,
+xmin=220.8, xmax=9000.8,
+xtick style={color=black},
+y grid style={white!69.0196078431373!black},
+ylabel={runtime (ms)},
 ymajorgrids,
-ylabel={milliseconds},
-ymin=809.16673, ymax=5897.60767,
+ymin=-7.182275, ymax=542.042775,
 ytick style={color=black},
 xtick={256,512,1024,2048,4096,8192},
 xmode=log,
 log basis x={2}
 ]
-\addplot [semithick, color0, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color0, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1040.4595
-512 1060.2195
-1024 1125.8712
-2048 1357.3869
-4096 1734.7286
-8192 5666.3149
+256 17.7825
+512 18.3925
+1024 21.7125
+2048 36.678
+4096 110.5955
+8192 329.9845
 };
 \addlegendentry{1 gpu(s)}
-\addplot [semithick, color1, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color1, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1180.7463
-512 1192.0089
-1024 1246.0841
-2048 1401.1114
-4096 1482.2325
-8192 4352.6997
+256 20.0895
+512 20.282
+1024 26.802
+2048 51.015
+4096 158.818
+8192 517.078
 };
 \addlegendentry{2 gpu(s)}
-\addplot [semithick, color2, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color2, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1160.189
-512 1172.315
-1024 1215.4055
-2048 1437.0471
-4096 1332.1246
-8192 3829.9215
+256 18.3065
+512 19.7095
+1024 24.269
+2048 47.096
+4096 131.1145
+8192 470.225
 };
 \addlegendentry{3 gpu(s)}
-\addplot [semithick, color3, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color3, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1142.1205
-512 1151.1407
-1024 1200.5422
-2048 1296.423
-4096 1123.9428
-8192 2815.0289
+256 18.196
+512 19.06
+1024 23.4485
+2048 44.208
+4096 132.185
+8192 486.677
 };
 \addlegendentry{4 gpu(s)}
-\addplot [semithick, color4, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color4, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1186.6067
-512 1274.4659
-1024 1262.8315
-2048 1363.3863
-4096 1185.021
-8192 3031.0638
+256 20.2195
+512 20.115
+1024 24.017
+2048 45.1005
+4096 118.8765
+8192 499.4245
 };
 \addlegendentry{5 gpu(s)}
-\addplot [semithick, color5, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color5, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1249.8318
-512 1283.7929
-1024 1342.972
-2048 1555.5516
-4096 1180.2642
-8192 2876.8623
+256 21.3855
+512 21.679
+1024 23.844
+2048 43.263
+4096 112.4205
+8192 391.38
 };
 \addlegendentry{6 gpu(s)}
-\addplot [semithick, color6, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, color6, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1274.0675
-512 1301.7888
-1024 1339.8769
-2048 1413.0304
-4096 1262.7955
-8192 3081.9822
+256 23.044
+512 22.765
+1024 24.8165
+2048 41.827
+4096 112.8525
+8192 399.4225
 };
 \addlegendentry{7 gpu(s)}
-\addplot [semithick, white!49.8039215686275!black, mark=*, mark size=3, mark options={solid,fill opacity=0}]
+\addplot [semithick, white!49.8039215686275!black, mark=*, mark size=1, mark options={solid,fill opacity=0}]
 table {%
-256 1391.7687
-512 1399.2011
-1024 1347.5316
-2048 1477.6536
-4096 1162.1531
-8192 2404.0085
+256 23.923
+512 24.656
+1024 25.793
+2048 41.087
+4096 120.198
+8192 359.02
 };
 \addlegendentry{8 gpu(s)}
 \end{axis}
