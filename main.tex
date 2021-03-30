@@ -1,15 +1,35 @@
+%% LyX 2.3.6.2 created this file.  For more info, see http://www.lyx.org/.
+%% Do not edit unless you really know what you are doing.
 \documentclass[sigconf,nonacm]{acmart}
 \usepackage[utf8]{inputenc}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+\usepackage{array}
+\usepackage{mathtools}
+\usepackage{graphicx}
+\ifx\hypersetup\undefined
+  \AtBeginDocument{%
+    \hypersetup{unicode=true}
+  }
+\else
+  \hypersetup{unicode=true}
+\fi
+
+\makeatletter
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% LyX specific LaTeX commands.
+%% Because html converters don't know tabularnewline
+\providecommand{\tabularnewline}{\\}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% User specified LaTeX commands.
 \usepackage{pgfplots}
 \usepackage{subcaption}
 \usepackage{adjustbox}
-\usepackage{mathtools}
-\usepackage{graphicx}
 \usepackage{url}
 %\usepackage{minted}
 
 
-\DeclareUnicodeCharacter{2212}{−}
+%\DeclareUnicodeCharacter{2212}{}
 \usepgfplotslibrary{groupplots,dateplot}
 \usetikzlibrary{
     patterns,
@@ -29,6 +49,7 @@
 }
 \usepackage{array}
 
+
 \pgfplotsset{compat=newest}
 
 \newcommand{\code}[1]{\texttt{#1}}
@@ -45,193 +66,286 @@
   \newcommand{\todo}[1]{{\textcolor{blue}{ TODO: #1 }}}
 \fi
 
+\makeatother
 
 \begin{document}
-
 \title{Ultrafast focus detection using multi-scale histologic features}
-
-
 \author{Maksim Levental}
 \affiliation{\institution{University of Chicago}}
 \author{Ryan Chard}
 \affiliation{\institution{Argonne National Laboratory}}
 \author{Gregg A. Wildenberg}
 \affiliation{\institution{University of Chicago}}
-
 \begin{abstract}
-    We present a fast out-of-focus detection algorithm for electron microscopy images collected serially.
-    Such images are collected for the purposes of post-processing tasks such as montaging, alignment, and image segmentation.
-    Such an algorithm is necessitated by recent increases in collection rates owing to advances in microscopy technology.
-    Our technique adapts classical computer vision and is based on detecting various fine-grained histologic features.
-    We further exploit the inherent parallelism in the technique by employing GPGPU primitives in order to accelerate characterization.
-    Tests are performed that demonstrate faster than real time detection of out-of-focus conditions.
-    <We also deploy to funcX something something>.
-    We discuss extensions that enable scaling out to support multi-beam microscopes and integration with existing focus systems for purposes of implementing auto-focus.
-
+We present a fast out-of-focus detection algorithm for electron microscopy
+images collected serially. Such images are collected for the purposes
+of post-processing tasks such as montaging, alignment, and image segmentation.
+Such an algorithm is necessitated by recent increases in collection
+rates owing to advances in microscopy technology. Our technique adapts
+classical computer vision and is based on detecting various fine-grained
+histologic features. We further exploit the inherent parallelism in
+the technique by employing GPGPU primitives in order to accelerate
+characterization. Tests are performed that demonstrate faster than
+real time detection of out-of-focus conditions. \textless We also
+deploy to funcX something something\textgreater . We discuss extensions
+that enable scaling out to support multi-beam microscopes and integration
+with existing focus systems for purposes of implementing auto-focus.
 \end{abstract}
-
 \maketitle
 
-\section{Introduction}\label{sec:intro}
+\section{Introduction}
 
-Advancements in the automation of serial scanning electron microscopy (SEM)  impose a regime where thousands, if not tens of thousands, of images can now be automatically collected by researchers.
-\todo{<bio use cases>}
-This puts greater demand on conventional auto-focus algorithms for ensuring each image is in focus, as an alternative to the user manually evaluating each image by eye.
-Without such algorithms, critical bottlenecks are created where the user is forced to reacquire individual, deficient (out-of-focus), images and manually reinsert them into the sequence of thousands of other images already acquired.
-This is an onerous task which requires taking into account alignment and boundary overlap.
-Furthermore, failure to quickly identify and reacquire deficient images negatively impacts the accuracy of downstream, post-processing; for example 2D montaging, 3D alignment, or automatic segmentation pipelines.
-While many microscopes have builtin auto-focus algorithms, these often fail to achieve acceptable accuracy due to intrinsic mediating factors (e.g. stage drift) and extrinsic mediating factors (e.g. sample artifacts, non-uniformity in the sample).
+\label{sec:intro}
 
-Auto-focus technology is a critical component of many imaging systems; from consumer cameras (for purposes of convenience) to industrial inspection tools to scientific instrumentation.
-Such technology is typically either active or passive; active methods exploit some auxiliary device or mechanism to measure the distance of the optics from the scene, while passive methods analyze the definition of sharpness of an image by virtue of some proxy measure.
-Here we focus on passive methods, as we explicitly aim to augment existing microscopy equipment without the need for costly and complex retrofitting.
+Advancements in the automation of serial scanning electron microscopy
+(SEM) impose a regime where thousands, if not tens of thousands, of
+images can now be automatically collected by researchers. \todo{\textless bio
+use cases\textgreater} This puts greater demand on conventional
+auto-focus algorithms for ensuring each image is in focus, as an alternative
+to the user manually evaluating each image by eye. Without such algorithms,
+critical bottlenecks are created where the user is forced to reacquire
+individual, deficient (out-of-focus), images and manually reinsert
+them into the sequence of thousands of other images already acquired.
+This is an onerous task which requires taking into account alignment
+and boundary overlap. Furthermore, failure to quickly identify and
+reacquire deficient images negatively impacts the accuracy of downstream,
+post-processing; for example 2D montaging, 3D alignment, or automatic
+segmentation pipelines. While many microscopes have builtin auto-focus
+algorithms, these often fail to achieve acceptable accuracy due to
+intrinsic mediating factors (e.g. stage drift) and extrinsic mediating
+factors (e.g. sample artifacts, non-uniformity in the sample).
 
-Passive proxies for the degree-of-focus (DOF) include the energy of the Laplacian, discrete cosine transform, or weighted histogram of an image; for effecting a high DOF a search can be performed.
-When used as a component of an auto-focus system (as opposed to OOF detection system) all such passive methods are unsuitable for the purpose of real-time (or even near-real-time) characterization of DOF due to their long scanning times (multiple images need to be collected at potentially different depths).
-As our method currently aims only to detect OOF events we do not consider or implement any focus search techniques (but do describe plans for such future work).
+Auto-focus technology is a critical component of many imaging systems;
+from consumer cameras (for purposes of convenience) to industrial
+inspection tools to scientific instrumentation. Such technology is
+typically either active or passive; active methods exploit some auxiliary
+device or mechanism to measure the distance of the optics from the
+scene, while passive methods analyze the definition of sharpness of
+an image by virtue of some proxy measure. Here we focus on passive
+methods, as we explicitly aim to augment existing microscopy equipment
+without the need for costly and complex retrofitting.
 
-To overcome these challenges, thereby ensuring that images are faithfully acquired, we propose a method to evaluate image definition based multi-scale histologic feature detection (MHD).
-By multi-scale histologic feature detection we mean the resolving and characterization of histological structure at multiple length scales; for our particular use-case this means structures ranging from cell walls to whole organelles.
-The key insight being that the ability to resolve structure across the range of feature scales is highly correlated with a high-definition, i.e. in-focus, image.
+Passive proxies for the degree-of-focus (DOF) include the energy of
+the Laplacian, discrete cosine transform, or weighted histogram of
+an image; for effecting a high DOF a search can be performed. When
+used as a component of an auto-focus system (as opposed to OOF detection
+system) all such passive methods are unsuitable for the purpose of
+real-time (or even near-real-time) characterization of DOF due to
+their long scanning times (multiple images need to be collected at
+potentially different depths). As our method currently aims only to
+detect OOF events we do not consider or implement any focus search
+techniques (but do describe plans for such future work).
 
-Due to limitations of the extensibility of commercial microscopy equipment, we do not aim here to directly implement auto-focusing.
-Rather than focusing the microscope, as auto-focusing algorithms would, our algorithm operates downstream of collection and reports out-of-focus (OOF) events to the user.
-This enables the user to intervene and initiate reacquisition protocols (on the microscope) before unknowingly proceeding with collecting the next series of images or proceeding with downstream image processing and analysis.
-This human-in-the-loop remediation protocol already saves the user much wasted collection time and tedium in triaging defective collection runs.
+To overcome these challenges, thereby ensuring that images are faithfully
+acquired, we propose a method to evaluate image definition based multi-scale
+histologic feature detection (MHFD). By multi-scale histologic feature
+detection we mean the resolving and characterization of histological
+structure at multiple length scales; for our particular use-case this
+means structures ranging from cell walls to whole organelles. The
+key insight being that the ability to resolve structure across the
+range of feature scales is highly correlated with a high-definition,
+i.e. in-focus, image.
 
-This rest of this article is organized as follows: section~\ref{sec:mhd} describes our focus detection method in the abstract, section~\ref{sec:implementation} discusses optimizations made in order to achieve real-time performance with our method, section~\ref{sec:evaluation} reports results of evaluating our method on sequences of images collected at varying focus depths, section~\ref{sec:related} discusses related work and how our work is distinct therefrom, and finally section~\ref{sec:conclusion} concludes with a discussion of future research.
+Due to limitations of the extensibility of commercial microscopy equipment,
+we do not aim here to directly implement auto-focusing. Rather than
+focusing the microscope, as auto-focusing algorithms would, our algorithm
+operates downstream of collection and reports out-of-focus (OOF) events
+to the user. This enables the user to intervene and initiate reacquisition
+protocols (on the microscope) before unknowingly proceeding with collecting
+the next series of images or proceeding with downstream image processing
+and analysis. This human-in-the-loop remediation protocol already
+saves the user much wasted collection time and tedium in triaging
+defective collection runs.
+
+This rest of this article is organized as follows: section~\ref{sec:mhd}
+describes our focus detection method in the abstract, section \ref{sec:implementation}
+discusses optimizations made in order to achieve real-time performance
+with our method, section \ref{sec:Evaluation} reports results of
+evaluating our method on sequences of images collected at varying
+focus depths, section \ref{sec:related} discusses related work and
+how our work is distinct therefrom, and finally section \ref{sec:conclusion}
+concludes with a discussion of future research.
 
 \section{Gregg sells science!}
 
 TYPE HERE
 
-\section{Multi-scale Histologic Feature Detection}\label{sec:mhd}
+\section{Multi-scale Histologic Feature Detection\label{sec:mhd}}
 
-We base our multi-scale histologic feature detection on classic on scale-space representations of signals.
-We give a brief overview (a more comprehensive discussion is available~\cite{}) and describe our adaptation.
+\subsection{Scale-space}
 
-The fundamental principle of scale-space feature detection is that natural images possess structure at multiple scales and that features at a particular scale can be characterized in isolation of features at other scales.
-Typically characterization is effected by convolution with a filter that satisfies the constraints of non-enhancement of local extrema, scale invariance and rotational invariance (along with some others~\cite{}).
-One such filter~\cite{} is the symmetric, mean zero, 2D, Gaussian filter
-$$
-    G(x,y,\sigma) \coloneqq \frac{1}{2\pi \sigma^2} e^{-\frac{x^2 +y ^2}{2\sigma^2}}
-$$
-Thus, define the scale-space representation $L(x,y, t)$ of an image $I(x,y)$ to be the convolution of that image with a mean zero Gaussian filter:
-$$
-    L(x,y,t) \coloneqq G(x,y,t) * I(x,y)
-$$
-where $t$ is the standard deviation of the Gaussian and determines the \textit{scale} of $L(x,y,t)$.
-$L(x,y,t)$ has the interpretation that image one-dimensional structures of scale smaller than $\sqrt{t^2} = t$ have been removed due to blurring.
-This is due to the fact that the variance of the Gaussian filter is $t^2$ and features of this scale are therefore "beneath the noise floor" of the filter or, in effect, suppressed by filtering procedure.
-A corollary is that features with length scale $t$ will have maximal response being filtered by $G(x,y,t)$; for $t' < t$ smaller length scale features will dominate the response and for $t'' > t$, as already mentioned, the response will have been suppressed.
-Hence, at various scales $t$ we can use linear and non-linear combinations of space derivatives $\partial_x, \partial_y$ and derivatives in the scale $\partial_t$ to construct scale-invariant feature detectors; such feature detectors detect features such as corners, edges, and ridges.
-For example, the zeros in scale of the scale normalized Laplacian
+We base our multi-scale histologic feature detection on classic scale-space
+representations of signals. We give a brief overview (a more comprehensive
+discussion is available \citet{Lindeberg2004FeatureDW}) and describe
+our adaptation.
+
+The fundamental principle of scale-space feature detection is that
+natural images possess structure at multiple scales and that features
+at a particular scale can be characterized in isolation of features
+at other scales. Typically, characterization is effected by convolution
+with a filter that satisfies the constraints of non-enhancement of
+local extrema, scale invariance and rotational invariance (along with
+some others \citet{duits2004axioms}). One such filter \citet{koenderink1984structure}
+is the symmetric, mean zero, two dimensional, Gaussian filter 
+\[
+G(x,y,\sigma)\coloneqq\frac{1}{2\pi\sigma^{2}}e^{-\frac{x^{2}+y^{2}}{2\sigma^{2}}}
+\]
+Thus, define the scale-space representation $L(x,y,t)$ of an image
+$I(x,y)$ to be the convolution of that image with a mean zero Gaussian
+filter: 
+\[
+L(x,y,t)\coloneqq G(x,y,t)*I(x,y)
+\]
+where $t$ determines the \textit{scale} of $L(x,y,t)$. $L(x,y,t)$
+has the interpretation that image structures of scale smaller than
+$\sqrt{t^{2}}=t$ have been removed due to blurring. This is due to
+the fact that the variance of the Gaussian filter is $t^{2}$ and
+features of this scale are therefore ``beneath the noise floor''
+of the filter or, in effect, suppressed by filtering procedure. A
+corollary is that features with approximate length scale $t$ will
+have maximal response upon being filtered by $G(x,y,t)$; for $t'<t$
+smaller length scale features will dominate the response and for $t''>t$,
+as already mentioned, the response will have been suppressed. Hence,
+at various scales we can use linear and non-linear combinations of
+space derivatives $\partial_{x},\partial_{y}$ and derivatives in
+scale $\partial_{t}$ to construct scale-invariant feature detectors;
+such feature detectors detect features such as corners, edges, and
+ridges. For example, the critical points in $t$ 
 \begin{equation}
-    \partial_t \nabla^2 L \coloneqq \partial_t \left( \partial_x^2 + \partial _y^2\right) L = 0
-    \label{eqn:blobdetector}
+\partial_{t}\nabla^{2}L\coloneqq\partial_{t}\left(\partial_{x}^{2}+\partial_{y}^{2}\right)L\label{eqn:blobdetector}
 \end{equation}
 correspond to uniform region (otherwise known as blobs) detectors.
 
-\section{Implementation}\label{sec:implementation}
+\subsection{Multi-scale Histologic Feature Detection}
+
+\label{sec:implementation}
 
 \begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \includegraphics[width=1\linewidth]{in_focus.png}
-        \caption{Histologic features of an in-focus section.}
-        \label{subfig:infocus}
-    \end{subfigure}
-    \par\medskip
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \includegraphics[width=1\linewidth]{out_of_focus.png}
-        \caption{Histologic features of an out-of-focus section.}
-        \label{subfig:outoffocus}
-    \end{subfigure}
-    \caption{Comparison of sections with histologic feature recognition as a function of focal depth.}
-    \label{fig:histfeatsimages}
+\centering \begin{subfigure}[b]{0.5\textwidth} \centering \includegraphics[width=1\linewidth]{in_focus}
+\caption{Histologic features of an in-focus section.}
+\label{subfig:infocus} \end{subfigure} 
+
+\medskip{}
+\begin{subfigure}[b]{0.5\textwidth} \centering \includegraphics[width=1\linewidth]{out_of_focus}
+\caption{Histologic features of an out-of-focus section.}
+\label{subfig:outoffocus} \end{subfigure} \caption{Comparison of sections with histologic feature recognition as a function
+of focal depth.}
+\label{fig:histfeatsimages} 
 \end{figure}
 
-We therefore propose to use a feature detector as a proxy for DOF, reasoning that quantity of features detected is positively correlated with DOF (see figure~\ref{fig:histfeatsimages}).
-To this end, we develop a feature detector based on eqn.~\ref{eqn:blobdetector} but optimized for latency (rather than for accuracy).
-In order to verify our hypothesis we compare the number of histologic features detected as a function of absolute deviation from in-focus ($\lvert f - f' \rvert$ where $f'$ is the correct focal depth) for a series of sections with known focal depth (see figure~\ref{subfig:degreeoofcurve}).
-We observe a very strong log-linear relationship (see figure~\ref{subfig:degreeooffit}).
-Fitting such a log-linear relationship produces a line with $r=-0.9754$, confirming our hypothesis that quantity of histologic features detected is a good proxy measure for DOF.
+We propose to use feature detection as a proxy for DOF, reasoning
+that the quantity of features detected is positively correlated with
+DOF (see figure \ref{fig:histfeatsimages}). To this end, we develop
+a feature detector based on eqn. \ref{eqn:blobdetector} but optimized
+for latency (rather than for accuracy). In order to verify our hypothesis
+we compare the number of histologic features detected as a function
+of absolute deviation from in-focus ($\lvert f-f'\rvert$ where $f'$
+is the correct focal depth) for a series of sections with known focal
+depth (see figure \ref{subfig:degreeoofcurve}). We observe a very
+strong log-linear relationship (see figure \ref{subfig:degreeooffit}).
+Fitting such a log-linear relationship produces a line with $r=-0.9754$,
+confirming our hypothesis that quantity of histologic features detected
+is a good proxy measure for DOF.
 
 \begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \input{blob_count_curve}
-        \caption{Number of histologic features as a function of absolute deviation from focused ($\lvert f - f' \rvert$ where $f'$ is the correct focal depth).}
-        \label{subfig:degreeoofcurve}
-    \end{subfigure}
-    \par\medskip
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \input{blob_count_fit}
-        \caption{Log plot and line fit with $r = -0.9754$.}
-        \label{subfig:degreeooffit}
-    \end{subfigure}
-    \caption{Comparison of histologic feature recognition as a function of focal depth.}
-    \label{fig:histfeats}
+\centering \begin{subfigure}[b]{0.5\textwidth} \centering \input{blob_count_curve.tex}
+\caption{Number of histologic features as a function of absolute deviation
+from focused ($\lvert f-f'\rvert$ where $f'$ is the correct focal
+depth).}
+\label{subfig:degreeoofcurve} \end{subfigure} 
+
+\medskip{}
+\begin{subfigure}[b]{0.5\textwidth} \centering \input{blob_count_fit.tex}
+\caption{Log plot and line fit with $r=-0.9754$.}
+\label{subfig:degreeooffit} \end{subfigure} \caption{Comparison of histologic feature recognition as a function of focal
+depth.}
+\label{fig:histfeats} 
 \end{figure}
 
-We now discuss our implementation\footnote{\href{https://github.com/makslevental/cuda_blob/}{https://github.com/makslevental/cuda\_blob/}} of the feature detector, with particular attention paid to optimizations in consideration of inference latency.
-Eqn.~\ref{eqn:blobdetector} permits a discretization\footnote{By virtue of $G$ being the Green's function of the heat equation $t \nabla^2 G = \partial_t G$} called \textit{Difference of Gaussians} (DoG) (see ~\cite{})
-$$
-    t^2 \nabla^2 L \approx  t \times \left(L(x,y, t + \delta t) - L(x,y, t)\right)
-$$
-Therefore, define
+We now discuss our implementation\footnote{\href{https://github.com/makslevental/cuda_blob/}{https://github.com/makslevental/cuda\_blob/}}
+of the feature detector, with particular attention paid to optimizations
+in consideration of inference latency. Eqn. \ref{eqn:blobdetector}
+permits a discretization\footnote{By virtue of $G$ being the Green's function of the heat equation
+$t\nabla^{2}G=\partial_{t}G$.} called \textit{Difference of Gaussians} (DoG) (see~\citet{marr1980theory})
+\[
+t^{2}\nabla^{2}L\approx t\times\left(L(x,y,t+\delta t)-L(x,y,t)\right)
+\]
+Therefore, define 
 \begin{itemize}
-    \item $\mathtt{n\_bin}$, which determines the quantity of scales determined
-    \item $\mathtt{min\_t}$, the minimum scale detected
-    \item $\mathtt{max\_t}$, the maximum scale detected
-    \item $\delta t \coloneqq (\mathtt{max\_t} -\mathtt{min\_t})/\mathtt{n\_bin}$
-    \item $t_i \coloneqq \mathtt{min\_t} + (i-1) \times \delta t$, the discrete scales detected
+\item $n$, which determines the quantity of scales determined 
+\item $\min_{t}$, the minimum scale detected 
+\item $\max_{t}$, the maximum scale detected 
+\item $\delta t\coloneqq(\max_{t}-\min_{t})/n$ 
+\item $t_{i}\coloneqq\min_{t}+(i-1)\times\delta t$, the discrete scales
+detected 
 \end{itemize}
-and finally the discretized DoG
+and finally the discretized DoG 
 \begin{equation}
-    \operatorname{DoG}(x,y,i) \coloneqq t_i \times \left( L(x,y,t_{i+1})-L(x,y,t_i) \right)
-    \label{eqn:dog}
+\operatorname{DoG}(x,y,i)\coloneqq t_{i}\times\left(L(x,y,t_{i+1})-L(x,y,t_{i})\right)\label{eqn:dog}
 \end{equation}
-This produces a stack $\{ \operatorname{DoG}(x,y,i) \}$, in the scale dimension, of filtered and scaled images (called a Gaussian pyramid~\cite{}).
+This produces a sequence $\{\operatorname{DoG}(x,y,i)\}$ of filtered
+and scaled images (called a Gaussian pyramid \citet{derpanis2005gaussian}).
 
-Computing the maxima of $\operatorname{DoG}(x,y,i)$ in the scale dimension (equivalently zeros of eqn.~\ref{eqn:blobdetector}) necessarily entails computing local\footnote{In a small pixel neighborhood in both space and scale dimensions.} maxima at every scale.
-We make the heuristic assumption that at each pixel there is a single unique, maximal, response at some scale; this response corresponds to the scale at which the variance of the Gaussian filter $G$ most closely corresponds to the scale of the feature.
-We therefore search for local maxima in $x,y$ but \textit{global} maxima in the scale dimension
+Computing maxima of $\operatorname{DoG}(x,y,i)$ in the scale dimension
+(equivalently zeros of eqn. \ref{eqn:blobdetector}) necessarily entails
+computing local\footnote{In a small pixel neighborhood in both space and scale dimensions.}
+maxima at every scale. We make the heuristic assumption that at each
+pixel there is a single unique, maximal, response at some scale; this
+response corresponds to the scale at which the variance of the Gaussian
+filter $G$ most closely corresponds to the scale of the feature.
+We therefore search for local maxima in $x,y$ but \textit{global}
+maxima in the scale dimension 
 \begin{equation}
-    \{(\hat{x}_j, \hat{y}_j, \hat{i}_j)\} \coloneqq \operatorname*{argmaxlocal}_{x,y} \operatorname*{argmax}_{i} \operatorname{DoG}(x,y,i)
-    \label{eqn:argmax}
+\{(\hat{x}_{j},\hat{y}_{j},\hat{i}_{j})\}\coloneqq\operatorname*{argmaxlocal}_{x,y}\operatorname*{argmax}_{i}\operatorname{DoG}(x,y,i)\label{eqn:argmax}
 \end{equation}
 where the subscript $j$ indexes over the features detected.
 
-It is readily apparent that our feature detector is parallelizable; for each scale $i$ we can compute $L(x,y,t_i)$ independently.
-Naturally, this suggests a GPGPU implementation~\cite{}.
-Therefore we develop our histologic feature detector to be maximally parallelizable in order to take advantage of the SIMT~\cite{} execution model of the conventional GPU.
-A further parallelization is possible for the $\operatorname*{argmax}$ operation since the maximum is computed independently across pixels.
-In order to make full use of this optimization we first perform the inner $\operatorname*{argmax}$ in eqn.~\ref{eqn:argmax} and then the outer.
-The inner $\operatorname*{argmax}$ is "free", as the $\operatorname*{argmax}$ primitive is implemented in exactly this way on GPUs, and the outer $\operatorname*{argmaxlocal}$ is implemented using a $\operatorname{MaxPool2D}(n,n)$ (with $n=3$).
-Employing $\operatorname{MaxPool2D}$ in this way has the added benefit of effectively performing non-maximum suppression, since it effectively rejects candidate maxima within a $3 \times 3$ neighborhood of a true maximum.
+It is readily apparent that our histologic feature detector is parallelizable;
+for each scale $i$ we can compute $L(x,y,t_{i})$ independently.
+A further parallelization is possible for the $\operatorname*{argmax}$
+operation, since the maximum is computed independently across neighborhoods
+of pixels. In order to maximally exploit this we first perform the
+inner $\operatorname*{argmax}$ in eqn. \ref{eqn:argmax} and then
+the outer. Note that the implementation of the inner $\operatorname*{argmax}$
+is ``free'', since the $\operatorname*{argmax}$ primitive is implemented
+in exactly this way in most GPGPU libraries \citet{CUB}. The outer
+$\operatorname*{argmaxlocal}$ is implemented using a $\operatorname{MaxPool2D}(n,n)$
+(with $n=3$). Employing $\operatorname{MaxPool2D}$ in this way has
+the added benefit of effectively performing non-maximum suppression,
+since it effectively rejects spurrious candidate maxima within a $3\times3$
+neighborhood of a true maximum.
 
-Typically one would compute  $L(x,y,t_{i})$ in the naive way (by convolving $G$ and $I$) but prior work has shown~\cite{citemerfpaper} that performing the convolution in the Fourier domain is much more efficient; namely
-$$
-    L(x,y,t_i) = \mathcal{F}^{-1} \big\{\mathcal{F}\{G(x,y,t_i)\} \cdot \mathcal{F}\{I(x,y)\} \big\}
-$$
-This approach has the added benefit that we can make use of highly optimized FFT routines made available by GPU manufacturers.
-In particular we can take advantage of \textit{distributed} FFT routines; by partition the set of Gaussian filters $\{ G(x,y,t_i) \}$ across $m$ nodes we can, in principle reap, a linear increase in efficiency of the FFT.
-That is to say we actually carry out
-$$
-    \{ L(x,y,t_i) \mid i \in I_j \} = \big\{ \mathcal{F}^{-1} \{\mathcal{F}\{G(x,y,t_i)\} \cdot \mathcal{F}\{I(x,y)\} \} \mid i \in I_j \big\}
-$$
-where for $j = 1, \dots, m$ the set $I_j$ indexes the scales allocated to a node $j$.
-In practice FFT time (both forward and inverse) is strongly dominated by I/O but this partitioning is still crucial in instances where our images are too large to fit in the RAM available on a single GPU (see section~\ref{sec:evaluation}).
+Typically one would compute $L(x,y,t_{i})$ in the naive way (by convolving
+$G$ and $I$) but prior work has shown \citet{9307788} that performing
+the convolution in the Fourier domain is much more efficient; namely
+\[
+L(x,y,t_{i})=\mathcal{F}^{-1}\big\{\mathcal{F}\{G(x,y,t_{i})\}\cdot\mathcal{F}\{I(x,y)\}\big\}
+\]
+where $\mathcal{F}\left\{ \cdot\right\} ,\mathcal{F}^{-1}\left\{ \cdot\right\} $
+are the Fourier transform and inverse Fourier transform, respectively.
+This approach has the additional advantage that we can make use of
+highly optimized Fast Fourier Transform (FFT) routines made available
+by GPGPU libraries. In particular, we can take advantage of \textit{distributed}
+FFT routines; by partitioning the set of Gaussian filters $\{G(x,y,t_{i})\}$
+across $m$ nodes we can, in principle, reap a linear increase in
+efficiency of the FFT. That is to say we actually carry out 
+\[
+\{L(x,y,t_{i})\mid i\in I_{j}\}=\big\{\mathcal{F}^{-1}\{\mathcal{F}\{G(x,y,t_{i})\}\cdot\mathcal{F}\{I(x,y)\}\}\mid i\in I_{j}\big\}
+\]
+where for $j=1,\dots,m$ the set $I_{j}$ indexes the scales allocated
+to a node $j$. In practice FFT execution time (both forward and inverse)
+is strongly dominated by I/O but this partitioning is still crucial
+in instances where our images are too large to fit in the RAM available
+on a single GPU (see section \ref{subsec:computers_eval}).
 
-One remaining detail is histogram normalization of the images.
-Due to the dynamic range (i.e. variable bit depth) of the SEM we need to normalize the histogram of pixel values; we do this by saturating $.175\%$ of the darkest pixels, saturating $.175\%$ of the lightest pixels, and mapping the entire range to $[0,1]$.
-We find this gives us consistently robust results with respect to noise and anomalous features.
-This histogram normalization is also parallelized using GPU primitives.
+One remaining detail is histogram normalization of the images. Due
+to the dynamic range (i.e. variable bit depth) of the SEM we need
+to normalize the histogram of pixel values; we do this by saturating
+$.175\%$ of the darkest pixels, saturating $.175\%$ of the lightest
+pixels, and mapping the entire range to $[0,1]$. We find this gives
+us consistently robust results with respect to noise and anomalous
+features. This histogram normalization is also parallelized using
+GPU primitives.
 
 % Thus our algorithm takes the form
 % \begin{minted}[escapeinside=||,mathescape=true]{python}
@@ -240,7 +354,6 @@ This histogram normalization is also parallelized using GPU primitives.
 %     # centered in array height x width
 
 % def get_local_maxima(dogs, sigma):
-
 
 % def detect_features(
 %     image, n_bins, min_sigma, max_sigma
@@ -255,102 +368,136 @@ This histogram normalization is also parallelized using GPU primitives.
 %     filtered_imgs = |$\mathcal{F}^{-1}\{ \mathcal{F}\{ \mathtt{image} \} * \mathcal{F}\{ \mathtt{kernels} \}  \}$| 
 %     dog = (filtered_imgs[:-1] -    filtered_imgs[1:]) * sigmas
 
-
-
-
 % \end{minted}
 
-\section{Evaluation}\label{sec:evaluation}
+\section{Evaluation\label{sec:Evaluation}}
 
-
-
+\subsection{Science}
 
 \begin{figure}
-    \centering
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \input{nbin_vs_gpu}
-        \caption{Median runtime as a function of number of feature scales at resolution $=1024 \times 1024$.}
-        \label{subfig:nbins}
-    \end{subfigure}
-    \par\medskip
-    \begin{subfigure}[b]{0.5\textwidth}
-        \centering
-        \input{res_vs_gpu}
-        \caption{Median runtime as a function of section resolution with 16 feature scales.}
-        \label{subfig:res}
-    \end{subfigure}
-    \caption{Scaling experiments for runtime with respect to number of GPUs, resolution, and number of feature scales.}
-    \label{fig:evalplots}
+\centering \begin{subfigure}[b]{0.5\textwidth} \centering \input{nbin_vs_gpu.tex}
+\caption{Median runtime as a function of number of feature scales at resolution
+$=1024\times1024$.}
+\label{subfig:nbins} \end{subfigure} 
+
+\medskip{}
+\begin{subfigure}[b]{0.5\textwidth} \centering \input{res_vs_gpu.tex}
+\caption{Median runtime as a function of section resolution with 16 feature
+scales.}
+\label{subfig:res} \end{subfigure} \caption{Scaling experiments for runtime with respect to number of GPUs, resolution,
+and number of feature scales.}
+\label{fig:evalplots} 
 \end{figure}
 
+Brains were prepared in the same manner and as previously described
+\citet{}. Briefly, an anesthetized animal was first transcardially
+perfused with 10ml 0.1 M Sodium Cacodylate (cacodylate) buffer, pH
+7.4 (Electron microscopy sciences (EMS) followed by 20 ml of fixative
+containing 2\% paraformaldehyde (EMS), 2.5\% glutaraldehyde (EMS)
+in 0.1 M Sodium Cacodylate (cacodylate) buffer, pH 7.4 (EMS). The
+brain was removed and placed in fixative for at least 24 hours at
+4C. A series of 300 um vibratome sections were prepared and put into
+fixative for 24 hours at 4C. The primary visual cortex (V1) was identified
+using areal landmarks and reference atlases. A small piece (~2 x
+2 mm) containing V1 was cut out and prepared for EM by staining sequentially
+with 2\% osmium tetroxide (EMS) in cacodylate buffer, 2.5\% potassium
+ferrocyanide (Sigma-Aldrich), thiocarbohydrazide, unbuffered 2\% osmium
+tetroxide, 1\% uranyl acetate, and 0.66\% Aspartic acid buffered Lead
+(II) Nitrate with extensive rinses between each step with the exception
+of potassium ferrocyanide. The tissue was then dehydrated in ethanol
+and propylene oxide and infiltrated with 812 Epon resin (EMS, Mixture:
+49\% Embed 812, 28\% DDSA, 21\% NMA, and 2.0\% DMP 30). The resin-infiltrated
+tissue was cured at 60oC for 3 days. Using a commercial ultramicrotome
+(Powertome, RMC), the cured block was trimmed to a ~1.0mm x 1.5 mm
+rectangle and ~2,000, 40nm thick sections were collected on polyimide
+tape (Kapton) using an automated tape collecting device (ATUM, RMC)
+and assembled on silicon wafers as previously described (ref??). Images
+at different focal distances were acquired using backscattered electron
+detection with a Gemini 300 scanning electron microscope (Carl Zeiss),
+equipped with ATLAS software for automated imaging. Dwell times for
+all datasets were 1.0 microsecond.
 
-Brains were prepared in the same manner and as previously described~\cite{}.
-Briefly, an anesthetized animal was first transcardially perfused with 10ml 0.1 M Sodium Cacodylate (cacodylate) buffer, pH 7.4 (Electron microscopy sciences (EMS) followed by 20 ml of fixative containing 2\% paraformaldehyde (EMS), 2.5\% glutaraldehyde (EMS) in 0.1 M Sodium Cacodylate (cacodylate) buffer, pH 7.4 (EMS).
-The brain was removed and placed in fixative for at least 24 hours at 4C.
-A series of 300 um vibratome sections were prepared and put into fixative for 24 hours at 4C.
-The primary visual cortex (V1) was identified using areal landmarks and reference atlases.
-A small piece (~2 x 2 mm) containing V1 was cut out and prepared for EM by staining sequentially with 2\% osmium tetroxide (EMS) in cacodylate buffer, 2.5\% potassium ferrocyanide (Sigma-Aldrich), thiocarbohydrazide, unbuffered 2\% osmium tetroxide, 1\% uranyl acetate, and 0.66\% Aspartic acid buffered Lead (II) Nitrate with extensive rinses between each step with the exception of potassium ferrocyanide.
-The tissue was then dehydrated in ethanol and propylene oxide and infiltrated with 812 Epon resin (EMS, Mixture: 49\% Embed 812, 28\% DDSA, 21\% NMA, and 2.0\% DMP 30).
-The resin-infiltrated tissue was cured at 60oC for 3 days.
-Using a commercial ultramicrotome (Powertome, RMC), the cured block was trimmed to a ~1.0mm x 1.5 mm rectangle and ~2,000, 40nm thick sections were collected on polyimide tape (Kapton) using an automated tape collecting device (ATUM, RMC) and assembled on silicon wafers as previously described (ref??). Images at different focal distances were acquired using backscattered electron detection with a Gemini 300 scanning electron microscope (Carl Zeiss), equipped with ATLAS software for automated imaging. Dwell times for all datasets were 1.0 microsecond.
+\subsection{Computers\label{subsec:computers_eval}}
 
 \begin{table}
-    \caption{Test platform}
+\caption{Test platform}
 
-    \vspace{-2ex}
+\vspace{-2ex}
 
-    \centering
-    \begin{tabular}[t]{p{0.15\linewidth}p{0.75\linewidth}}
-        \hline
-        CPU      & Dual AMD Rome 7742 @ 2.25GHz            \\
-        GPU      & 8x NVIDIA A100-40GB                     \\
-        HD       & 4x 3.84 U.2 NVMe SSD                    \\
-        RAM      & 1TB                                     \\
-        Software & CuPy-8.3.0, CUDA-11.0, NVIDIA-450.51.05 \\
-        \hline
-    \end{tabular}
-    \label{tab:test}
+\centering %
+\begin{tabular}[t]{p{0.15\linewidth}p{0.75\linewidth}}
+\hline 
+CPU  & Dual AMD Rome 7742 @ 2.25GHz \tabularnewline
+GPU  & 8x NVIDIA A100-40GB \tabularnewline
+HD  & 4x 3.84 U.2 NVMe SSD \tabularnewline
+RAM  & 1TB \tabularnewline
+Software  & CuPy-8.3.0, CUDA-11.0, NVIDIA-450.51.05 \tabularnewline
+\hline 
+\end{tabular}\label{tab:test} 
 \end{table}
 
-We perform runtime experiments across a range of parameters of interest (section resolution, number of feature scales).
-Our test platform is a NVIDIA DGX A100 (see table~\ref{tab:test}).
-Experiments consist of computing the DOF of a sample section for a given configuration.
-All experiments are repeated $k$ times (with $k=21$) and all metrics reported are in fact median statistics\footnote{We discard the first execution since it is an outlier due to various initializations (e.g. pinning CUDA memory).}.
+We perform runtime experiments across a range of parameters of interest
+(section resolution, number of feature scales). Our test platform
+is a NVIDIA DGX A100 (see table \ref{tab:test}). Experiments consist
+of computing the DOF of a sample section for a given configuration.
+All experiments are repeated $k$ times (with $k=21$) and all metrics
+reported are in fact median statistics\footnote{We discard the first execution since it is an outlier due to various
+initializations (e.g. pinning CUDA memory).}.
 
-For a section resolution of $1024 \times 1024$ pixels we achieve approximately a 50Hz runtime in the single GPU configuration; this is XXXX faster than real time.
-We observe that, as expected, runtime grows linearly with the number of feature scales and quadratically with the resolution of the section; naturally, this is owing to the parallel architecture of the GPU.
-The principle defect of our technique is that it is highly dependent on the available RAM of the GPU it is deployed to.
-In practice, most GPUs available at the edge, i.e. proximal to microscopy instruments, will have insufficient ram to accommodate large section resolutions and wide feature scale ranges.
-In fact, even the 40GB of the DGX's A100 is exhausted at resolutions above $4096 \times 4096$ for more than $\sim$ 20 feature scales.
+For a section resolution of $1024\times1024$ pixels we achieve approximately
+a 50Hz runtime in the single GPU configuration; this is XXXX faster
+than real time. We observe that, as expected, runtime grows linearly
+with the number of feature scales and quadratically with the resolution
+of the section; naturally, this is owing to the parallel architecture
+of the GPU. The principle defect of our technique is that it is highly
+dependent on the available RAM of the GPU it is deployed to. In practice,
+most GPUs available at the edge, i.e. proximal to microscopy instruments,
+will have insufficient ram to accommodate large section resolutions
+and wide feature scale ranges. In fact, even the 40GB of the DGX's
+A100 is exhausted at resolutions above $4096\times4096$ for more
+than approximately 20 feature scales.
 
 \begin{figure}
-    \centering
-    \input{stacked_runtime}
-    \caption{Breakdown of runtime into the four major phases for two GPUs across feature scales at resolution $=1024 \times 1024$.}
-    \label{fig:stacked}
+\centering \input{stacked_runtime.tex} \caption{Breakdown of runtime into the four major phases for two GPUs across
+feature scales at resolution $=1024\times1024$.}
+\label{fig:stacked} 
 \end{figure}
 
-Therefore, we further investigate parallelizing MHD across multiple GPUs.
-Our implementation parallelizes MHD in a straightforward fashion: we partition the set of filters across the GPUs, perform the ``lighter'' FFT-IFFT pair on each constituent GPU, and then gather the results to the root GPU (arbitrarily chosen).
-Note that for such multi-GPU configurations the range of feature scales was chosen to be a multiple of the number of GPUs (hence the proportionally increasing sparsity of data in figure~\ref{subfig:nbins}).
-We observe that, as one would expect, runtime is inversely proportional to number of GPUs (see figure~\ref{subfig:res}) but that for instances where a single GPU configuration is sufficient it is also optimal.
-More precise timing reveals that parallelization across multiple GPUs incurs high copy costs during the gather phase of parallel MHD (see figure~\ref{fig:stacked}).
-Note that this latency persists even after taking advantage of CUDA IPC~\cite{6270863}.
-In effect, this is a fairly obvious demonstration of Amdahl's law.
-Therefore, we emphasize that parallelization across multiple GPUs should only be considered in instances where full resolution section images are of the utmost necessity\footnote{For example, when feature scale range are very wide, with detection at the lower end of the scale being critical. In all other cases downsampling by bilinear interpolation in order to satisfy GPU RAM constraints yields a more than reasonable tradeoff between accuracy and latency.}.
+Therefore, we further investigate parallelizing MHFD across multiple
+GPUs. Our implementation parallelizes MHFD in a straightforward fashion:
+we partition the set of filters across the GPUs, perform the ``lighter''
+FFT-IFFT pair on each constituent GPU, and then gather the results
+to the root GPU (arbitrarily chosen). Note that for such multi-GPU
+configurations the range of feature scales was chosen to be a multiple
+of the number of GPUs (hence the proportionally increasing sparsity
+of data in figure \ref{subfig:nbins}). We observe that, as one would
+expect, runtime is inversely proportional to number of GPUs (see figure
+\ref{subfig:res}) but that for instances where a single GPU configuration
+is sufficient it is also optimal. More precise timing reveals that
+parallelization across multiple GPUs incurs high copy costs during
+the gather phase of parallel MHFD (see figure \ref{fig:stacked}).
+Note that this latency persists even after taking advantage of CUDA
+IPC \citet{6270863}. In effect, this is a fairly obvious demonstration
+of Amdahl's law. Therefore, we emphasize that parallelization across
+multiple GPUs should only be considered in instances where full resolution
+section images are of the utmost necessity\footnote{For example, when feature scale range are very wide, with detection
+at the lower end of the scale being critical. In all other cases downsampling
+by bilinear interpolation in order to satisfy GPU RAM constraints
+yields a more than reasonable tradeoff between accuracy and latency.}.
 
-\section{Related work}\label{sec:related}
-\section{Conclusion}\label{sec:conclusion}
+\section{Related work}
 
+\label{sec:related} 
+
+\section{Conclusion}
+
+\label{sec:conclusion}
 \begin{acks}
-    This work was supported by the U.S. Department of Energy, Office of Science, under contract DE-AC02-06CH11357.
-    % \ryan{Marius LDRD}
+This work was supported by the U.S. Department of Energy, Office of
+Science, under contract DE-AC02-06CH11357. % \ryan{Marius LDRD}
 \end{acks}
 
 \bibliographystyle{ACM-Reference-Format}
 \bibliography{biblio}
 
 \end{document}
-
-
