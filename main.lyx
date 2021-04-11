@@ -13,7 +13,6 @@
 %\usepackage{minted}
 
 
-%\DeclareUnicodeCharacter{2212}{−}
 \usepgfplotslibrary{groupplots,dateplot}
 \usetikzlibrary{
     patterns,
@@ -32,7 +31,17 @@
     external
 }
 \usepackage{array}
-
+\usepackage{algorithmicx,algpseudocode}
+% declaration of the new block
+\algblock{ParFor}{EndParFor}
+% customising the new block
+\algnewcommand\algorithmicparfor{\textbf{parfor}}
+\algnewcommand\algorithmicpardo{\textbf{do}}
+\algnewcommand\algorithmicendparfor{\textbf{end}}
+\algrenewtext{ParFor}[1]{\algorithmicparfor\ #1\ \algorithmicpardo}
+\algrenewtext{EndParFor}{\algorithmicendparfor}
+\renewcommand{\algorithmicrequire}{\textbf{Input:}} 
+\renewcommand{\algorithmicensure}{\textbf{Output:}}
 
 \pgfplotsset{compat=newest}
 
@@ -71,7 +80,7 @@
 \use_dash_ligatures true
 \graphics default
 \default_output_format default
-\output_sync 0
+\output_sync 1
 \bibtex_command default
 \index_command default
 \paperfontsize default
@@ -186,12 +195,16 @@ We present a fast out-of-focus detection algorithm for electron microscopy
  as montaging, alignment, and image segmentation.
  Such an algorithm is necessitated by recent increases in collection rates
  owing to advances in microscopy technology.
- Our technique adapts classical computer vision and is based on detecting
+ Our technique, 
+\shape italic
+Multi-scale Histologic Feature Detection
+\shape default
+, adapts classical computer vision techniques and is based on detecting
  various fine-grained histologic features.
  We further exploit the inherent parallelism in the technique by employing
  GPGPU primitives in order to accelerate characterization.
- Tests are performed that demonstrate faster than real time detection of
- out-of-focus conditions.
+ Tests are performed that demonstrate near-real-time detection of out-of-focus
+ conditions.
  <We also deploy to funcX something something>.
  We discuss extensions that enable scaling out to support multi-beam microscopes
  and integration with existing focus systems for purposes of implementing
@@ -213,33 +226,13 @@ name "sec:intro"
 \end_layout
 
 \begin_layout Standard
+\begin_inset Note Comment
+status collapsed
+
+\begin_layout Plain Layout
 Advancements in the automation of serial scanning electron microscopy (SEM)
  impose a regime where thousands, if not tens of thousands, of images can
  now be automatically collected by researchers.
- 
-\begin_inset ERT
-status collapsed
-
-\begin_layout Plain Layout
-
-
-\backslash
-todo{
-\end_layout
-
-\end_inset
-
-<bio use cases>
-\begin_inset ERT
-status collapsed
-
-\begin_layout Plain Layout
-
-}
-\end_layout
-
-\end_inset
-
  This puts greater demand on conventional auto-focus algorithms for ensuring
  each image is in focus, as an alternative to the user manually evaluating
  each image by eye.
@@ -259,54 +252,164 @@ status collapsed
  sample artifacts, non-uniformity in the sample).
 \end_layout
 
+\end_inset
+
+
+\end_layout
+
+\begin_layout Standard
+A fundamental goal of neuroscience is to map the anatomical relationships
+ of the brain.
+ Currently this is challenging because electron microscopy, an imaging method
+ traditionally limited to small images, is the only imaging modality with
+ sufficient resolution to directly visualize the connections, or synapses,
+ between neurons.
+ Recently, automated serial electron microscopy, broadly called 
+\shape italic
+connectomics
+\shape default
+, has been developed.
+ This technique is characterized by thousands, if not tens of thousands,
+ of individual images being automatically acquired in series and then registered
+ to produce a volumetric dataset.
+ Such datasets allow neuroscientists to follow the tortuous path neurons
+ take through the brain to connect with each other (hence the name connectomics).
+ However, many of the steps that comprise the collection of such datasets
+ for connectomics require manual inspection causing significant slowdowns
+ in the rate at which datasets can be acquired.
+ Such bottlenecks significantly impact the size of the datasets that can
+ be reasonably acquired and studied.
+ Furthermore, advances in electron microscopes have increased the rate that
+ datasets can be acquired (e.g.
+ ~10 Tbs/24hr 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "zeiss:multisem550"
+literal "false"
+
+\end_inset
+
+) .
+ This further underscores the need for automation (in order that end-to-end
+ high throughput is achieved).
+ 
+\begin_inset Note Comment
+status collapsed
+
+\begin_layout Plain Layout
+Thus, without high fidelity automation of the imaging pipeline, the field
+ of connectomics will fail to advance and realize its full potential.
+ 
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
 \begin_layout Standard
 Auto-focus technology is a critical component of many imaging systems; from
  consumer cameras (for purposes of convenience) to industrial inspection
- tools to scientific instrumentation.
- Such technology is typically either active or passive; active methods exploit
- some auxiliary device or mechanism to measure the distance of the optics
- from the scene, while passive methods analyze the definition of sharpness
- of an image by virtue of some proxy measure.
- Here we focus on passive methods, as we explicitly aim to augment existing
- microscopy equipment without the need for costly and complex retrofitting.
+ tools to scientific instrumentation 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "1545017"
+literal "false"
+
+\end_inset
+
+.
+ Such technology is typically either 
+\shape italic
+active
+\shape default
+ or 
+\shape italic
+passive
+\shape default
+; active methods exploit some auxiliary device or mechanism to measure the
+ distance of the optics from the scene, while passive methods analyze the
+ definition or sharpness of an image by virtue of a proxy measure called
+ a 
+\shape italic
+criterion function
+\shape default
+.
+ Many electron microscopes incorporate auto-focus techniques that attempt
+ to focus the microscope before image acquisition.
+ Despite such functionality, out-of-focus (OOF) images still occur at high
+ rates (between 1% and 10%), depending on the quality of the tissue sections
+ being imaged.
+ Such error rates prevent effective automation since a prerequisite of the
+ downstream operations are that the images collected all have high degree-of-foc
+us (DOF).
+ Without properly focused images, all downstream computational steps (e.g.
+ 2D tile montaging, 3D alignment, automatic segmentation) will fail.
 \end_layout
 
 \begin_layout Standard
-Passive proxies for the degree-of-focus (DOF) include the energy of the
- Laplacian, discrete cosine transform, or weighted histogram of an image;
- for effecting a high DOF a search can be performed.
- When used as a component of an auto-focus system (as opposed to OOF detection
- system) all such passive methods are unsuitable for the purpose of real-time
- (or even near-real-time) characterization of DOF due to their long scanning
- times (multiple images need to be collected at potentially different depths).
- As our method currently aims only to detect OOF events we do not consider
- or implement any focus search techniques (but do describe plans for such
- future work).
+Thus, we seek to further the aims of automation by ensuring that images
+ acquired by the electron microscope have high DOF.
+ While seemingly a small step in the process, focus detection is nevertheless
+ an extremely critical step.
+ Consequently, because imaging sections requires loading and unloading sets
+ of ~100-200 sections at a time, failure to manually detect an out of focus
+ image in real time causes significant delays.
+ The affected sample sets need to be reloaded, desired field of view must
+ be reconfigured, and reaquired images need to be reinserted into the image
+ stack.
+ All such remediation steps are time and labor intensive.
 \end_layout
 
 \begin_layout Standard
-To overcome these challenges, thereby ensuring that images are faithfully
- acquired, we propose a method to evaluate image definition based multi-scale
- histologic feature detection (MHFD).
- By multi-scale histologic feature detection we mean the resolving and character
-ization of histological structure at multiple length scales; for our particular
- use-case this means structures ranging from cell walls to whole organelles.
- The key insight being that the ability to resolve structure across the
- range of feature scales is highly correlated with a high-definition, i.e.
- in-focus, image.
+Our proposed technique, 
+\shape italic
+Multi-scale Histologic Feature Detection
+\shape default
+ (MHFD), involves a second pass over the collected image, after it has been
+ acquired, using a computer vision system to detect a failure to successfully
+ achieve high DOF.
+ We use feature detection 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "Lindeberg2004FeatureDW"
+literal "false"
+
+\end_inset
+
+ as a criterion function, reasoning that the quantity of features detected
+ is positively correlated with DOF.
+ To this end, we develop a feature detector based on scale-space representations
+ of images (see section 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "sec:Backround"
+
+\end_inset
+
+) but optimized for latency (rather than for accuracy).
+ Our solution achieves low latency detection of the OOF condition with high
+ correlation (see section 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "sec:Evaluation"
+plural "false"
+caps "false"
+noprefix "false"
+
+\end_inset
+
+).
+ 
 \end_layout
 
 \begin_layout Standard
-Due to limitations of the extensibility of commercial microscopy equipment,
- we do not aim here to directly implement auto-focusing.
- Rather than focusing the microscope, as auto-focusing algorithms would,
- our algorithm operates downstream of collection and reports out-of-focus
- (OOF) events to the user.
- This enables the user to intervene and initiate reacquisition protocols
- (on the microscope) before unknowingly proceeding with collecting the next
- series of images or proceeding with downstream image processing and analysis.
- This human-in-the-loop remediation protocol already saves the user much
- wasted collection time and tedium in triaging defective collection runs.
+Note that we explicitly aim to augment existing microscopy equipment without
+ the need for costly and complex retrofitting.
+ This precludes mere improvements to auto-focus systems as they are, in
+ essence, proprietary black boxes from the perspective of the end user of
+ a commerical electron microscope.
+ 
 \end_layout
 
 \begin_layout Standard
@@ -316,28 +419,22 @@ This rest of this article is organized as follows: section
 
 
 \begin_inset CommandInset ref
-LatexCommand ref
-reference "sec:mhd"
-plural "false"
-caps "false"
-noprefix "false"
+LatexCommand eqref
+reference "sec:Backround"
 
 \end_inset
 
- describes our focus detection method in the abstract, section 
+ quickly reviews backround on scale-space feature detectors, section 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "sec:implementation"
-plural "false"
-caps "false"
-noprefix "false"
 
 \end_inset
 
- discusses optimizations made in order to achieve real-time performance
- with our method, section 
+ describes our focus detection method in the abstract and particular optimizatio
+ns made in order to achieve near-real-time performance, section 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "sec:Evaluation"
 plural "false"
 caps "false"
@@ -348,7 +445,14 @@ noprefix "false"
  reports results of evaluating our method on sequences of images collected
  at varying focus depths, section 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
+reference "sec:Discussion"
+
+\end_inset
+
+ discuss those results, and section 
+\begin_inset CommandInset ref
+LatexCommand eqref
 reference "sec:related"
 plural "false"
 caps "false"
@@ -356,67 +460,97 @@ noprefix "false"
 
 \end_inset
 
- discusses related work and how our work is distinct therefrom, and finally
- section 
-\begin_inset CommandInset ref
-LatexCommand ref
-reference "sec:conclusion"
-plural "false"
-caps "false"
-noprefix "false"
-
-\end_inset
-
- concludes with a discussion of future research.
+ discusses related work and how our work is distinct therefrom.
 \end_layout
 
 \begin_layout Section
-Gregg sells science!
-\end_layout
-
-\begin_layout Standard
-TYPE HERE
-\end_layout
-
-\begin_layout Section
-Multi-scale Histologic Feature Detection
+Scale-space representations
 \begin_inset CommandInset label
 LatexCommand label
-name "sec:mhd"
+name "sec:Backround"
 
 \end_inset
 
 
 \end_layout
 
-\begin_layout Subsection
-Scale-space
-\end_layout
-
 \begin_layout Standard
-We base our multi-scale histologic feature detection on classic scale-space
- representations of signals.
- We give a brief overview (a more comprehensive discussion is available
- 
+We base our multi-scale histologic feature detection technique on classical
+ scale-space representations of signals and images.
+ We give a brief overview (see 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "Lindeberg2004FeatureDW"
 literal "false"
 
 \end_inset
 
-) and describe our adaptation.
+ for a more comprehensive review).
+ 
 \end_layout
 
 \begin_layout Standard
 The fundamental principle of scale-space feature detection is that natural
- images possess structure at multiple scales and that features at a particular
- scale can be characterized in isolation of features at other scales.
- Typically, characterization is effected by convolution with a filter that
- satisfies the constraints of non-enhancement of local extrema, scale invariance
- and rotational invariance (along with some others 
+ images possess structureful features at multiple scales and that features
+ at a particular scale isolated from features at other scales.
+ Thus any image 
+\begin_inset Formula $I\left(x,y\right)$
+\end_inset
+
+ can transformed into a scale-space representation 
+\begin_inset Formula $L\left(x,y,t\right)$
+\end_inset
+
+, where 
+\begin_inset Formula $L\left(x',y',t'\right)$
+\end_inset
+
+ represents the pixel intensity
+\shape italic
+
+\begin_inset Foot
+status collapsed
+
+\begin_layout Plain Layout
+Hence, scale-space since we consider the image along dimensions of scale
+ and space.
+\end_layout
+
+\end_inset
+
+
+\shape default
+ at pixel coordinates 
+\begin_inset Formula $\left(x',y'\right)$
+\end_inset
+
+ and 
+\shape italic
+scale 
+\begin_inset Formula $t'$
+\end_inset
+
+.
+
+\shape default
+ How to produce the representation of the image at each scale is discussed
+ in the forth coming.
+ More importantly, such a representation lends itself readily to scale sensitive
+ feature detection owing to the fact that features at a particular scale
+ are decoupled from features at other scales, thereby eliminating confounding
+ detections.
+ Examples of structureful features that can be detected and characterized
+ using scale-space representations include edges, corners, ridges, and so
+ called blobs (roughly circular regions of uniform intensity).
+\end_layout
+
+\begin_layout Standard
+A scale-space representation at a particular scale is constructed by convolution
+ of the image with a filter that satisfies the constraints of non-enhancement
+ of local extrema, scale invariance and rotational invariance (along with
+ some others 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "duits2004axioms"
 literal "false"
 
@@ -425,7 +559,7 @@ literal "false"
 ).
  One such filter 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "koenderink1984structure"
 literal "false"
 
@@ -434,7 +568,7 @@ literal "false"
  is the symmetric, mean zero, two dimensional, Gaussian filter 
 \begin_inset Formula 
 \[
-G(x,y,\sigma)\coloneqq\frac{1}{2\pi\sigma^{2}}e^{-\frac{x^{2}+y^{2}}{2\sigma^{2}}}
+G\left(x,y,\sigma\right)\coloneqq\frac{1}{2\pi\sigma^{2}}e^{-\frac{x^{2}+y^{2}}{2\sigma^{2}}}
 \]
 
 \end_inset
@@ -448,9 +582,12 @@ Thus, define the scale-space representation
 \end_inset
 
  to be the convolution of that image with a mean zero Gaussian filter: 
+\end_layout
+
+\begin_layout Standard
 \begin_inset Formula 
 \[
-L(x,y,t)\coloneqq G(x,y,t)*I(x,y)
+L\left(x,y,t\right)\coloneqq G\left(x,y,t\right)*I\left(x,y\right)
 \]
 
 \end_inset
@@ -459,15 +596,7 @@ where
 \begin_inset Formula $t$
 \end_inset
 
- determines the 
-\shape italic
-scale
-\shape default
- of 
-\begin_inset Formula $L(x,y,t)$
-\end_inset
-
-.
+ determines the scale.
  
 \begin_inset Formula $L(x,y,t)$
 \end_inset
@@ -498,17 +627,60 @@ beneath the noise floor
 \begin_inset Formula $G(x,y,t)$
 \end_inset
 
-; for 
+.
+ That is to say, for a 
+\begin_inset Formula $t$
+\end_inset
+
+ scale feature at pixel coordinates 
+\begin_inset Formula $\left(x,y\right)$
+\end_inset
+
+ and for scales 
+\begin_inset Formula $t'<t<t''$
+\end_inset
+
+ we have
+\end_layout
+
+\begin_layout Standard
+\begin_inset Formula 
+\[
+L\left(x,y,t'\right)<L\left(x,y,t\right)<L\left(x,y,t''\right)
+\]
+
+\end_inset
+
+This is due to the fact that for scales 
 \begin_inset Formula $t'<t$
 \end_inset
 
- smaller length scale features will dominate the response and for 
-\begin_inset Formula $t''>t$
+, small scale features will dominate the response and for 
+\begin_inset Formula $t<t''$
 \end_inset
 
-, as already mentioned, the response will have been suppressed.
- Hence, at various scales we can use linear and non-linear combinations
- of space derivatives 
+, as already mentioned, the feature will have been suppressed.
+ 
+\end_layout
+
+\begin_layout Standard
+Note that the aforementioned presumes having identified the pixel coordinates
+ 
+\begin_inset Formula $\left(x,y\right)$
+\end_inset
+
+ as the locus of the feature.
+ Thus, in order to detect features across scales and space, maximal responses
+ in spatial dimensions 
+\begin_inset Formula $\left(x,y\right)$
+\end_inset
+
+ need to also be characterized.
+ For such characterization one generally employs standard calculus in order
+ to identify critical points of second order derivatives.
+ Hence, we can construct scale-sensitive feature detectors by considering
+ critical points of linear and non-linear combinations of spatial derivatives
+ 
 \begin_inset Formula $\partial_{x},\partial_{y}$
 \end_inset
 
@@ -516,13 +688,8 @@ beneath the noise floor
 \begin_inset Formula $\partial_{t}$
 \end_inset
 
- to construct scale-invariant feature detectors; such feature detectors
- detect features such as corners, edges, and ridges.
- For example, the critical points in 
-\begin_inset Formula $t$
-\end_inset
-
- 
+.
+ For example the scale derivative of the Laplacian
 \begin_inset Formula 
 \begin{equation}
 \partial_{t}\nabla^{2}L\coloneqq\partial_{t}\left(\partial_{x}^{2}+\partial_{y}^{2}\right)L\label{eqn:blobdetector}
@@ -530,14 +697,12 @@ beneath the noise floor
 
 \end_inset
 
-correspond to uniform region (otherwise known as blobs) detectors.
+effectively detects regions of uniform pixel intensity (i.e.
+ blobs).
 \end_layout
 
-\begin_layout Subsection
+\begin_layout Section
 Multi-scale Histologic Feature Detection
-\end_layout
-
-\begin_layout Standard
 \begin_inset CommandInset label
 LatexCommand label
 name "sec:implementation"
@@ -795,11 +960,11 @@ name "fig:histfeatsimages"
 \end_layout
 
 \begin_layout Standard
-We propose to use feature detection as a proxy for DOF, reasoning that the
- quantity of features detected is positively correlated with DOF (see figure
- 
+We propose to use histologic feature detection at multiple scales as a criterion
+ function, reasoning that the absolute quantity of features detected at
+ multiple scales is positively correlated with DOF (see figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "fig:histfeatsimages"
 plural "false"
 caps "false"
@@ -808,10 +973,14 @@ noprefix "false"
 \end_inset
 
 ).
+ For our particular use-case this is tantamount to detecting histologic
+ structures ranging from cell walls to whole organelles.
+ The key insight is that the ability to resolve structure across the range
+ of feature scales is highly correlated with a high-definition image.
  To this end, we develop a feature detector based on eqn.
  
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "eqn:blobdetector"
 plural "false"
 caps "false"
@@ -820,8 +989,13 @@ noprefix "false"
 \end_inset
 
  but optimized for latency (rather than for accuracy).
- In order to verify our hypothesis we compare the number of histologic features
- detected as a function of absolute deviation from in-focus (
+ 
+\end_layout
+
+\begin_layout Standard
+Firstly, in order to verify our hypothesis that detecting features across
+ a range of scales is correlated with DOF, we compare the number of histologic
+ features detected as a function of absolute deviation from in-focus (
 \begin_inset Formula $\lvert f-f'\rvert$
 \end_inset
 
@@ -832,7 +1006,7 @@ noprefix "false"
  is the correct focal depth) for a series of sections with known focal depth
  (see figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "subfig:degreeoofcurve"
 plural "false"
 caps "false"
@@ -843,7 +1017,7 @@ noprefix "false"
 ).
  We observe a very strong log-linear relationship (see figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "subfig:degreeooffit"
 plural "false"
 caps "false"
@@ -852,12 +1026,17 @@ noprefix "false"
 \end_inset
 
 ).
- Fitting such a log-linear relationship produces a line with 
+ Fitting a log-linear relationship produces a line with 
 \begin_inset Formula $r=-0.9754$
 \end_inset
 
 , confirming our hypothesis that quantity of histologic features detected
  is a good proxy measure for DOF.
+ Note that the log-linear relationship corresponds to a roughly quadratic
+ decrease in the number of histologic features detected.
+ This is to be expected since, intuitively, a twice improved DOF of a two
+ dimensional image yields improved detection along both spatial dimensions
+ and thus a four times increased quantity of histologic features detected.
 \end_layout
 
 \begin_layout Standard
@@ -1120,7 +1299,7 @@ name "fig:histfeats"
 \end_layout
 
 \begin_layout Standard
-We now discuss our implementation
+We now discuss the design and implementation
 \begin_inset Foot
 status collapsed
 
@@ -1137,12 +1316,12 @@ literal "false"
 
 \end_inset
 
- of the feature detector, with particular attention paid to optimizations
- in consideration of inference latency.
+ of our multi-scale histologic feature detector, with particular attention
+ paid to optimizations in consideration of inference latency.
  Eqn.
  
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "eqn:blobdetector"
 plural "false"
 caps "false"
@@ -1152,7 +1331,7 @@ noprefix "false"
 
  permits a discretization
 \begin_inset Foot
-status open
+status collapsed
 
 \begin_layout Plain Layout
 By virtue of 
@@ -1178,7 +1357,7 @@ Difference of Gaussians
 
 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "marr1980theory"
 literal "false"
 
@@ -1187,7 +1366,7 @@ literal "false"
 ) 
 \begin_inset Formula 
 \[
-t^{2}\nabla^{2}L\approx t\times\left(L(x,y,t+\delta t)-L(x,y,t)\right)
+t^{2}\nabla^{2}L\approx t\times\left(L\left(x,y,t+\delta t\right)-L\left(x,y,t\right)\right)
 \]
 
 \end_inset
@@ -1199,7 +1378,7 @@ Therefore, define
 \begin_inset Formula $n$
 \end_inset
 
-, which determines the quantity of scales determined 
+, which determines the granularity of the scales detected 
 \end_layout
 
 \begin_layout Itemize
@@ -1217,14 +1396,14 @@ Therefore, define
 \end_layout
 
 \begin_layout Itemize
-\begin_inset Formula $\delta t\coloneqq(\max_{t}-\min_{t})/n$
+\begin_inset Formula $\delta t\coloneqq\left(\max_{t}-\min_{t}\right)/n$
 \end_inset
 
  
 \end_layout
 
 \begin_layout Itemize
-\begin_inset Formula $t_{i}\coloneqq\min_{t}+(i-1)\times\delta t$
+\begin_inset Formula $t_{i}\coloneqq\min_{t}+\left(i-1\right)\times\delta t$
 \end_inset
 
 , the discrete scales detected 
@@ -1234,35 +1413,54 @@ Therefore, define
 and finally the discretized DoG 
 \begin_inset Formula 
 \begin{equation}
-\operatorname{DoG}(x,y,i)\coloneqq t_{i}\times\left(L(x,y,t_{i+1})-L(x,y,t_{i})\right)\label{eqn:dog}
+\operatorname{DoG}\left(x,y,i\right)\coloneqq t_{i}\times\left(L\left(x,y,t_{i+1}\right)-L\left(x,y,t_{i}\right)\right)\label{eqn:dog}
 \end{equation}
 
 \end_inset
 
 This produces a sequence 
-\begin_inset Formula $\{\operatorname{DoG}(x,y,i)\}$
+\begin_inset Formula $\left\{ \operatorname{DoG}\left(x,y,i\right)\mid i=1,\dots,n\right\} $
 \end_inset
 
  of filtered and scaled images (called a Gaussian pyramid 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "derpanis2005gaussian"
 literal "false"
 
 \end_inset
 
 ).
+ Note that there are alternative convetions for how each difference in the
+ definition of 
+\begin_inset Formula $\operatorname{DoG}\left(x,y,i\right)$
+\end_inset
+
+ should be scaled (including partitioning into so called 
+\shape italic
+octaves
+\shape default
+ 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "1095851"
+literal "false"
+
+\end_inset
+
+) but we empirically determine that linear scaling is sufficient for our
+ needs.
 \end_layout
 
 \begin_layout Standard
 Computing maxima of 
-\begin_inset Formula $\operatorname{DoG}(x,y,i)$
+\begin_inset Formula $\operatorname{DoG}\left(x,y,i\right)$
 \end_inset
 
- in the scale dimension (equivalently zeros of eqn.
+ in the scale dimension (equivalently critical points of eqn.
  
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "eqn:blobdetector"
 plural "false"
 caps "false"
@@ -1281,25 +1479,34 @@ In a small pixel neighborhood in both space and scale dimensions.
 \end_inset
 
  maxima at every scale.
- We make the heuristic assumption that at each pixel there is a single unique,
- maximal, response at some scale; this response corresponds to the scale
- at which the variance of the Gaussian filter 
+ We make the heuristic assumption that, in each pixel neighborhood that
+ corresponds to a feature, there is a single unique and maximal response
+ at some scale 
+\begin_inset Formula $t$
+\end_inset
+
+.
+ This response corresponds to the scale at which the variance of the Gaussian
+ filter 
 \begin_inset Formula $G$
 \end_inset
 
- most closely corresponds to the scale of the feature.
- We therefore search for local maxima in 
+ most closely corresponds to the scale of the feature (see section 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "sec:Backround"
+
+\end_inset
+
+).
+ We therefore search for local maxima in spatial dimensions 
 \begin_inset Formula $x,y$
 \end_inset
 
- but 
-\shape italic
-global
-\shape default
- maxima in the scale dimension 
+ but global maxima in the scale dimension 
 \begin_inset Formula 
 \begin{equation}
-\{(\hat{x}_{j},\hat{y}_{j},\hat{i}_{j})\}\coloneqq\operatorname*{argmaxlocal}_{x,y}\operatorname*{argmax}_{i}\operatorname{DoG}(x,y,i)\label{eqn:argmax}
+\left\{ \left(\hat{x}_{j},\hat{y}_{j},\hat{i}_{j}\right)\right\} \coloneqq\operatorname*{argmaxlocal}_{x,y}\operatorname*{argmax}_{i}\operatorname{DoG}\left(x,y,i\right)\label{eqn:argmax}
 \end{equation}
 
 \end_inset
@@ -1309,25 +1516,41 @@ where the subscript
 \end_inset
 
  indexes over the features detected.
+ Once all such maxima are identified it suffices to compute and report the
+ cardinality of 
+\begin_inset Formula $\left\{ \left(\hat{x}_{j},\hat{y}_{j},\hat{i}_{j}\right)\right\} $
+\end_inset
+
+ as criterion function value.
 \end_layout
 
 \begin_layout Standard
-It is readily apparent that our histologic feature detector is parallelizable;
+We now discuss practical (i.e.
+ implementation) optimizations.
+ It is readily apparent that our histologic feature detector is parallelizable;
  for each scale 
-\begin_inset Formula $i$
+\begin_inset Formula $t_{i}$
 \end_inset
 
  we can compute 
-\begin_inset Formula $L(x,y,t_{i})$
+\begin_inset Formula $L\left(x,y,t_{i}\right)$
 \end_inset
 
- independently.
+ independently of all other 
+\begin_inset Formula $L\left(x,y,t_{j}\right)$
+\end_inset
+
+ (for 
+\begin_inset Formula $j\neq i$
+\end_inset
+
+).
  A further parallelization is possible for the 
 \begin_inset Formula $\operatorname*{argmax}$
 \end_inset
 
- operation, since the maximum is computed independently across neighborhoods
- of pixels.
+ operation, since the maxima are computed independently across distinct
+ neighborhoods of pixels.
  In order to maximally exploit this we first perform the inner 
 \begin_inset Formula $\operatorname*{argmax}$
 \end_inset
@@ -1335,7 +1558,7 @@ It is readily apparent that our histologic feature detector is parallelizable;
  in eqn.
  
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "eqn:argmax"
 plural "false"
 caps "false"
@@ -1343,8 +1566,28 @@ noprefix "false"
 
 \end_inset
 
- and then the outer.
- Note that the implementation of the inner 
+ on block of columns of 
+\begin_inset Formula $\left\{ \operatorname{DoG}\left(x,y,i\right)\right\} $
+\end_inset
+
+ in parallel, thereby effectively reducing the Gaussian pyramid to a single
+ image.
+ Note that when GPU memory is sufficient we can compute the 
+\begin_inset Formula $\operatorname*{argmax}$
+\end_inset
+
+ across all columns simulataneously (and other wise within a constant number
+ of steps).
+ We then perform the outer 
+\begin_inset Formula $\operatorname*{argmaxlocal}_{x,y}$
+\end_inset
+
+ on disjoint pixel neighborhoods of the flattened image in parallel as well.
+ 
+\end_layout
+
+\begin_layout Standard
+Note that the implementation of the inner 
 \begin_inset Formula $\operatorname*{argmax}$
 \end_inset
 
@@ -1362,18 +1605,26 @@ free
 
  primitive is implemented in exactly this way in most GPGPU libraries 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "CUB"
 literal "false"
 
 \end_inset
 
-.
+ and thus our substitution of 
+\begin_inset Formula $\operatorname*{argmax}_{i}$
+\end_inset
+
+ for 
+\begin_inset Formula $\operatorname*{argmaxlocal}_{i}$
+\end_inset
+
+ yields a small but not insignificant latency decrease.
  The outer 
 \begin_inset Formula $\operatorname*{argmaxlocal}$
 \end_inset
 
- is implemented using a 
+ is implemented using a comparison against 
 \begin_inset Formula $\operatorname{MaxPool2D}(n,n)$
 \end_inset
 
@@ -1381,14 +1632,29 @@ literal "false"
 \begin_inset Formula $n=3$
 \end_inset
 
-).
+) (see 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "9307788"
+literal "false"
+
+\end_inset
+
+ for details on this technique).
  Employing 
 \begin_inset Formula $\operatorname{MaxPool2D}$
 \end_inset
 
  in this way has the added benefit of effectively performing non-maximum
- suppression, since it effectively rejects spurrious candidate maxima within
- a 
+ suppression 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "1699659"
+literal "false"
+
+\end_inset
+
+, since it effectively rejects spurrious candidate maxima within a 
 \begin_inset Formula $3\times3$
 \end_inset
 
@@ -1400,7 +1666,7 @@ Typically one would compute
 \begin_inset Formula $L(x,y,t_{i})$
 \end_inset
 
- in the naive way (by convolving 
+ in the conventional way (by linearly convolving 
 \begin_inset Formula $G$
 \end_inset
 
@@ -1410,7 +1676,7 @@ Typically one would compute
 
 ) but prior work has shown 
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "9307788"
 literal "false"
 
@@ -1420,7 +1686,7 @@ literal "false"
  namely 
 \begin_inset Formula 
 \[
-L(x,y,t_{i})=\mathcal{F}^{-1}\big\{\mathcal{F}\{G(x,y,t_{i})\}\cdot\mathcal{F}\{I(x,y)\}\big\}
+L\left(x,y,t_{i}\right)=\mathcal{F}^{-1}\big\{\mathcal{F}\left\{ G\left(x,y,t_{i}\right)\right\} \cdot\mathcal{F}\left\{ I\left(x,y\right)\right\} \big\}
 \]
 
 \end_inset
@@ -1433,62 +1699,13 @@ where
  This approach has the additional advantage that we can make use of highly
  optimized Fast Fourier Transform (FFT) routines made available by GPGPU
  libraries.
- In particular, we can take advantage of 
-\shape italic
-distributed
-\shape default
- FFT routines; by partitioning the set of Gaussian filters 
-\begin_inset Formula $\{G(x,y,t_{i})\}$
-\end_inset
-
- across 
-\begin_inset Formula $m$
-\end_inset
-
- nodes we can, in principle, reap a linear increase in efficiency of the
- FFT.
- That is to say we actually carry out 
-\begin_inset Formula 
-\[
-\{L(x,y,t_{i})\mid i\in I_{j}\}=\big\{\mathcal{F}^{-1}\{\mathcal{F}\{G(x,y,t_{i})\}\cdot\mathcal{F}\{I(x,y)\}\}\mid i\in I_{j}\big\}
-\]
-
-\end_inset
-
-where for 
-\begin_inset Formula $j=1,\dots,m$
-\end_inset
-
- the set 
-\begin_inset Formula $I_{j}$
-\end_inset
-
- indexes the scales allocated to a node 
-\begin_inset Formula $j$
-\end_inset
-
-.
- In practice FFT execution time (both forward and inverse) is strongly dominated
- by I/O but this partitioning is still crucial in instances where our images
- are too large to fit in the RAM available on a single GPU (see section
- 
-\begin_inset CommandInset ref
-LatexCommand ref
-reference "subsec:computers_eval"
-plural "false"
-caps "false"
-noprefix "false"
-
-\end_inset
-
-).
 \end_layout
 
 \begin_layout Standard
-One remaining detail is histogram normalization of the images.
+One remaining detail is histogram stretching of the images.
  Due to the dynamic range (i.e.
- variable bit depth) of the SEM we need to normalize the histogram of pixel
- values; we do this by saturating 
+ variable bit depth) of the microscope we need to normalize the histogram
+ of pixel values; we do this by saturating 
 \begin_inset Formula $.175\%$
 \end_inset
 
@@ -1504,6 +1721,338 @@ One remaining detail is histogram normalization of the images.
  We find this gives us consistently robust results with respect to noise
  and anomalous features.
  This histogram normalization is also parallelized using GPU primitives.
+\end_layout
+
+\begin_layout Standard
+In summary our technique is presented in alg.
+ 
+\begin_inset CommandInset ref
+LatexCommand eqref
+reference "alg:Multi-scale-Histologic-Feature"
+
+\end_inset
+
+.
+\begin_inset Float algorithm
+wide false
+sideways false
+status open
+
+\begin_layout Plain Layout
+\begin_inset Caption Standard
+
+\begin_layout Plain Layout
+Multi-scale Histologic Feature Detection
+\begin_inset CommandInset label
+LatexCommand label
+name "alg:Multi-scale-Histologic-Feature"
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\begin_layout Plain Layout
+\begin_inset ERT
+status open
+
+\begin_layout Plain Layout
+
+
+\backslash
+begin{algorithmic}[1]
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+Require{$I
+\backslash
+left(x,y
+\backslash
+right), n, 
+\backslash
+min_{t}, 
+\backslash
+max_{t}, M$}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State $I'
+\backslash
+left(x,y
+\backslash
+right) 
+\backslash
+coloneqq 
+\backslash
+texttt{HistorgramStretch}(I
+\backslash
+left(x,y
+\backslash
+right))$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State 
+\backslash
+texttt{Broadcast}$
+\backslash
+left(I'
+\backslash
+left(x,y
+\backslash
+right), M
+\backslash
+right)$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+ParFor{$m 
+\backslash
+coloneqq 1,
+\backslash
+dots, M$}
+\end_layout
+
+\begin_layout Plain Layout
+
+  
+\backslash
+ParFor{$i
+\backslash
+in I_{m}$}
+\end_layout
+
+\begin_layout Plain Layout
+
+    
+\backslash
+State $L
+\backslash
+left(x,y,t_{i}
+\backslash
+right) 
+\backslash
+coloneqq 
+\backslash
+mathcal{F}^{-1}
+\backslash
+big
+\backslash
+{
+\backslash
+mathcal{F}
+\backslash
+left
+\backslash
+{ G
+\backslash
+left(x,y,t_{i}
+\backslash
+right)
+\backslash
+right
+\backslash
+} 
+\backslash
+cdot
+\backslash
+mathcal{F}
+\backslash
+left
+\backslash
+{ I'
+\backslash
+left(x,y
+\backslash
+right)
+\backslash
+right
+\backslash
+} 
+\backslash
+big
+\backslash
+}$
+\end_layout
+
+\begin_layout Plain Layout
+
+  
+\backslash
+EndParFor
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+EndParFor
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State 
+\backslash
+texttt{Gather}$
+\backslash
+left(L
+\backslash
+left(x,y,t_{i}
+\backslash
+right), M
+\backslash
+right)$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+ParFor{$i 
+\backslash
+coloneqq 1,
+\backslash
+dots, n+1$}
+\end_layout
+
+\begin_layout Plain Layout
+
+	
+\backslash
+State $
+\backslash
+operatorname{DoG}
+\backslash
+left(x,y,i
+\backslash
+right)
+\backslash
+coloneqq t_{i}
+\backslash
+times
+\backslash
+left(L
+\backslash
+left(x,y,t_{i+1}
+\backslash
+right)-L
+\backslash
+left(x,y,t_{i}
+\backslash
+right)
+\backslash
+right)$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+EndParFor
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+State $
+\backslash
+left
+\backslash
+{ 
+\backslash
+left(
+\backslash
+hat{x}_{j},
+\backslash
+hat{y}_{j},
+\backslash
+hat{i}_{j}
+\backslash
+right)
+\backslash
+right
+\backslash
+} 
+\backslash
+coloneqq
+\backslash
+operatorname*{argmaxlocal}_{x,y}
+\backslash
+operatorname*{argmax}_{i}
+\backslash
+operatorname{DoG}
+\backslash
+left(x,y,i
+\backslash
+right)$
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+Ensure{DOF $
+\backslash
+coloneqq 
+\backslash
+left| 
+\backslash
+left
+\backslash
+{ 
+\backslash
+left(
+\backslash
+hat{x}_{j},
+\backslash
+hat{y}_{j},
+\backslash
+hat{i}_{j}
+\backslash
+right)
+\backslash
+right
+\backslash
+} 
+\backslash
+right|$}
+\end_layout
+
+\begin_layout Plain Layout
+
+
+\backslash
+end{algorithmic}
+\end_layout
+
+\end_inset
+
+
+\end_layout
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
@@ -1828,10 +2377,6 @@ name "sec:Evaluation"
 
 \end_layout
 
-\begin_layout Subsection
-Science
-\end_layout
-
 \begin_layout Standard
 \begin_inset Float figure
 wide false
@@ -2131,17 +2676,6 @@ literal "false"
  Dwell times for all datasets were 1.0 microsecond.
 \end_layout
 
-\begin_layout Subsection
-Computers
-\begin_inset CommandInset label
-LatexCommand label
-name "subsec:computers_eval"
-
-\end_inset
-
-
-\end_layout
-
 \begin_layout Standard
 \begin_inset Float table
 wide false
@@ -2350,7 +2884,7 @@ For a section resolution of
 \end_inset
 
  pixels we achieve approximately a 50Hz runtime in the single GPU configuration;
- this is XXXX faster than real time.
+ this is near-real-time.
  We observe that, as expected, runtime grows linearly with the number of
  feature scales and quadratically with the resolution of the section; naturally,
  this is owing to the parallel architecture of the GPU.
@@ -2436,11 +2970,42 @@ lighter
 
  FFT-IFFT pair on each constituent GPU, and then gather the results to the
  root GPU (arbitrarily chosen).
+ That is to say we actually carry out 
+\begin_inset Formula 
+\[
+\left\{ L\left(x,y,t_{i}\right)\mid i\in I_{m}\right\} =\big\{\mathcal{F}^{-1}\big\{\mathcal{F}\left\{ G\left(x,y,t_{i}\right)\right\} \cdot\mathcal{F}\left\{ I\left(x,y\right)\right\} \big\}\mid i\in I_{m}\big\}
+\]
+
+\end_inset
+
+where for 
+\begin_inset Formula $m=1,\dots,M$
+\end_inset
+
+ the set 
+\begin_inset Formula $I_{m}$
+\end_inset
+
+ indexes the scales allocated to a node 
+\begin_inset Formula $m$
+\end_inset
+
+.
+ By partitioning the set of Gaussian filters 
+\begin_inset Formula $\left\{ G\left(x,y,t_{i}\right)\right\} $
+\end_inset
+
+ across 
+\begin_inset Formula $M$
+\end_inset
+
+ nodes, we effectively perform distributed filtering.
+ We use CUDA-aware OpenMPI to implement the distribution.
  Note that for such multi-GPU configurations the range of feature scales
  was chosen to be a multiple of the number of GPUs (hence the proportionally
  increasing sparsity of data in figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "subfig:nbins"
 plural "false"
 caps "false"
@@ -2452,7 +3017,7 @@ noprefix "false"
  We observe that, as one would expect, runtime is inversely proportional
  to number of GPUs (see figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "subfig:res"
 plural "false"
 caps "false"
@@ -2463,9 +3028,9 @@ noprefix "false"
 ) but that for instances where a single GPU configuration is sufficient
  it is also optimal.
  More precise timing reveals that parallelization across multiple GPUs incurs
- high copy costs during the gather phase of parallel MHFD (see figure 
+ high network copy costs during the gather phase (see figure 
 \begin_inset CommandInset ref
-LatexCommand ref
+LatexCommand eqref
 reference "fig:stacked"
 plural "false"
 caps "false"
@@ -2477,7 +3042,7 @@ noprefix "false"
  Note that this latency persists even after taking advantage of CUDA IPC
  
 \begin_inset CommandInset citation
-LatexCommand citet
+LatexCommand citep
 key "6270863"
 literal "false"
 
@@ -2485,9 +3050,8 @@ literal "false"
 
 .
  In effect, this is a fairly obvious demonstration of Amdahl's law.
- Therefore, we emphasize that parallelization across multiple GPUs should
- only be considered in instances where full resolution section images are
- of the utmost necessity
+ Therefore, parallelization across multiple GPUs should be considered in
+ instances where full resolution section images are necessary
 \begin_inset Foot
 status collapsed
 
@@ -2505,10 +3069,60 @@ For example, when feature scale range are very wide, with detection at the
 \end_layout
 
 \begin_layout Section
-Related work
+Discussion
+\begin_inset CommandInset label
+LatexCommand label
+name "sec:Discussion"
+
+\end_inset
+
+
 \end_layout
 
 \begin_layout Standard
+As stated in the introduction our intent here was to study an OOF detection
+ technique in order to augment existing microscopy instrumentation.
+ Rather than focusing the microscope, as auto-focusing algorithms would,
+ our algorithm operates downstream of image acquisition and reports out-of-focus
+ events to the user.
+ This enables the user to intervene and initiate reacquisition protocols
+ (on the microscope) before unknowingly proceeding with collecting the next
+ series of images or proceeding with downstream image processing and analysis.
+ Our technique is effective and operates at near-real-time latencies.
+ Thus, this human-in-the-loop remediation protocol already saves the user
+ much wasted collection time and tedium in triaging defective collection
+ runs.
+ Note that MHFD could in fact be employed in an iterative mode in order
+ that the DOF reported were used to adjust the focus of the microscope.
+ This would require close integration with the existing software and actuation
+ hardware of the microscope.
+ 
+\end_layout
+
+\begin_layout Standard
+Though our technique is efficient for use with a single GPU for small to
+ moderately sized image sections we emphasize that distribution across multiple
+ nodes will inevitably be necessary for use with microscopy instrumentation
+ in the near future.
+ The current state of the art ZEISS MultiSEM 505/506 employs 91 parallel
+ electron beams and images an entire 52 tile series in approximately 1.3s
+ 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "zeiss:multisem550"
+literal "false"
+
+\end_inset
+
+; this is approximately 25ms per tile or exactly 50Hz (i.e.
+ exactly the rate at which our technique operates).
+ For maximal efficiency in the end-to-end automation of connectomics our
+ solution (or refinements thereof) will need to be deployed and made available
+ to researchers.
+\end_layout
+
+\begin_layout Section
+Related work
 \begin_inset CommandInset label
 LatexCommand label
 name "sec:related"
@@ -2518,18 +3132,72 @@ name "sec:related"
  
 \end_layout
 
-\begin_layout Section
-Conclusion
-\end_layout
-
 \begin_layout Standard
-\begin_inset CommandInset label
-LatexCommand label
-name "sec:conclusion"
+There is much work in developing and improving auto-focus algorithms and
+ their applications to microscopy.
+ Yeo et al.
+ 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "YEO1993629"
+literal "false"
 
 \end_inset
 
+ was one of the first investigations of applying auto-focus to microscopy.
+ They compare several criterion functions and conclude that the so-called
+ Tenengrad criterion function is most accurate and most robust to noise.
+ The crucial difference between their evaluation criteria and ours is they
+ select for criterion functions that are suited for optical microscopy,
+ i.e.
+ criterion functions that are robust to staining/coloring (where as all
+ of our samples are grayscale).
+ Redondo et al.
+ 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "10.1117/1.JBO.17.3.036008"
+literal "false"
 
+\end_inset
+
+ reviews sixteen criterion functions and their computational cost in the
+ context of automated microscopy.
+ Bian et al.
+ 
+\begin_inset CommandInset citation
+LatexCommand citep
+key "https://doi.org/10.1002/jbio.202000227"
+literal "false"
+
+\end_inset
+
+ address the same issues that motivate us in that they aim to support automated
+ processes in the face of topographic variance in the samples (which lead
+ to compare OOF rates).
+ Their solutions distinguish themselves in that they employ active devices
+ (such as low-coherence interferometry).
+ Interestingly, seemingly contemporaneously with our project Luo et al.
+ 
+\begin_inset CommandInset citation
+LatexCommand citet
+key "doi:10.1021/acsphotonics.0c01774"
+literal "false"
+
+\end_inset
+
+ proposed a deep learning architecture that auto-focuses in a 
+\begin_inset Quotes eld
+\end_inset
+
+single-shot
+\begin_inset Quotes erd
+\end_inset
+
+ manner.
+ Such a solution is quite appealing given the affinity with our own application
+ of GPGPU to the problem and we intend to experiment with applying it to
+ our data.
 \end_layout
 
 \begin_layout Acknowledgments
